@@ -12,11 +12,12 @@ rm -rf /root/cobranza-poc
 git clone https://github.com/edescobar/cobranza-poc.git /root/cobranza-poc
 cd /root/cobranza-poc
 
-printf 'POSTGRES_PASSWORD=cobranza-poc-local\nOLLAMA_MODEL=qwen3:4b\n' > .env
+printf 'POSTGRES_PASSWORD=cobranza-poc-local\nOLLAMA_MODEL=qwen2.5:3b\n' > .env
 
 docker compose up -d postgres api ollama
 echo ">>> waiting for ollama to come up..."; sleep 15
-docker compose exec -T ollama ollama pull qwen3:4b </dev/null   # </dev/null so curl|bash doesn't eat the rest of the script
+# qwen2.5-instruct: no reasoning mode, answers directly (fast). Qwen3 reasons even with think:false.
+docker compose exec -T ollama ollama pull qwen2.5:3b </dev/null   # </dev/null so curl|bash doesn't eat the rest of the script
 docker compose exec -T postgres psql -U cobranza -d cobranza < db/seed_sample.sql
 sleep 5
 

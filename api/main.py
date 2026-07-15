@@ -73,9 +73,8 @@ async def classify_objection(text: str, model: str) -> str | None:
     labels = app_state["taxonomy"]
     sys = ("Clasificá el mensaje del deudor en UNA de estas categorías. "
            "Respondé SOLO con la etiqueta exacta (la clave), sin explicación.\nCategorías:\n"
-           + "\n".join(f"- {o['objection_type']}: {o['description_es']}" for o in labels)
-           + "\n\n/no_think")   # Qwen3 soft-switch: disable reasoning (latency)
-    payload = {"model": model, "stream": False, "think": False,
+           + "\n".join(f"- {o['objection_type']}: {o['description_es']}" for o in labels))
+    payload = {"model": model, "stream": False,
                "options": {"temperature": 0},
                "messages": [{"role": "system", "content": sys}, {"role": "user", "content": text}]}
     try:
@@ -93,7 +92,7 @@ async def classify_objection(text: str, model: str) -> str | None:
 
 
 async def chat_stream(model: str, messages: list) -> dict:
-    payload = {"model": model, "messages": messages, "stream": True, "think": False,
+    payload = {"model": model, "messages": messages, "stream": True,
                "options": {"temperature": 0.5}}
     t0 = time.perf_counter()
     ttft = None
@@ -151,9 +150,7 @@ async def reply(req: ReplyReq):
         messages.append({"role": "system",
                          "content": f"Táctica sugerida para esta situación: {tactic} — {tactic_desc}. "
                                     f"Aplicala con naturalidad, no la nombres."})
-    # `/no_think` goes on the LAST USER turn — that's where Qwen3's chat template reads the soft
-    # switch. In the system prompt it was ignored (the model still emitted a full <think> trace).
-    messages.append({"role": "user", "content": req.text + " /no_think"})
+    messages.append({"role": "user", "content": req.text})
 
     result = await chat_stream(model, messages)
     return {"model": model, "patterns": req.patterns, "objection": objection,
