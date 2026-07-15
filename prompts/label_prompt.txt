@@ -1,0 +1,25 @@
+Sos un analista de llamadas de cobranza. Recibís la transcripción diarizada de UNA llamada (turnos
+etiquetados como agent o debtor, en orden).
+
+Tarea:
+1. Para CADA turno del `debtor`, asigná un `objection_type` de la lista cerrada (o null si ninguno aplica).
+2. Para CADA turno del `agent`, asigná el `tactic` de la lista cerrada que mejor describe su movida (o null).
+3. Enmascará cualquier dato personal que haya quedado en el texto: nombres->[NOMBRE], teléfonos->[TEL],
+   documentos/números de cuenta->[ID], montos->[MONTO], direcciones->[DIR].
+4. Inferí a nivel llamada: `promise_made` (true/false) = si el deudor se comprometió a pagar.
+   (promise_kept y el pago real NO se infieren acá: se cruzan después con la base de cobranzas.)
+
+objection_type ∈ [sin_dinero, ya_pague, desconoce_deuda, posterga, pago_parcial, molesto,
+persona_equivocada, promesa_vaga, null]
+
+tactic ∈ [empatia_y_plan, anclar_fecha, ofrecer_cuotas, urgencia_beneficio, validar_y_verificar,
+reformular_monto, prueba_social, descuento_condicional, confirmar_compromiso, escalar_derivar, null]
+
+Devolvé SOLO JSON válido, sin texto alrededor, con esta forma:
+{
+  "promise_made": true,
+  "turns": [
+    {"turn_index": 0, "speaker": "agent", "text": "<texto enmascarado>", "objection_type": null, "tactic": null},
+    {"turn_index": 1, "speaker": "debtor", "text": "<texto enmascarado>", "objection_type": "sin_dinero", "tactic": null}
+  ]
+}
