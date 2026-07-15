@@ -119,6 +119,9 @@ async def chat_stream(model: str, messages: list) -> dict:
                     eval_dur = obj.get("eval_duration", 0)
     total = time.perf_counter() - t0
     tps = (eval_count / (eval_dur / 1e9)) if eval_dur else None
+    # Defensive: if any <think> trace leaks through, keep only the answer after </think>.
+    if "</think>" in text:
+        text = text.split("</think>")[-1]
     return {
         "text": text.strip(),
         "ttft_ms": round((ttft or total) * 1000),
@@ -143,14 +146,14 @@ async def reply(req: ReplyReq):
             if row:
                 tactic, tactic_desc = row["tactic"], row["description_es"]
 
-    # `/no_think` disables Qwen3's reasoning mode (a one-line collections reply must be instant,
-    # not preceded by thousands of reasoning tokens). Paired with think:false in the payload.
-    messages = [{"role": "system", "content": SYSTEM_PROMPT + "\n\n/no_think"}]
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     if tactic:
         messages.append({"role": "system",
                          "content": f"Táctica sugerida para esta situación: {tactic} — {tactic_desc}. "
                                     f"Aplicala con naturalidad, no la nombres."})
-    messages.append({"role": "user", "content": req.text})
+    # `/no_think` goes on the LAST USER turn — that's where Qwen3's chat template reads the soft
+    # switch. In the system prompt it was ignored (the model still emitted a full <think> trace).
+    messages.append({"role": "user", "content": req.text + " /no_think"})
 
     result = await chat_stream(model, messages)
     return {"model": model, "patterns": req.patterns, "objection": objection,
