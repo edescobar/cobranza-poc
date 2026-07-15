@@ -63,6 +63,13 @@ def keyword_objection(text: str) -> str | None:
 
 
 async def classify_objection(text: str, model: str) -> str | None:
+    # Keyword match first — instant, no model call. Covers the common objections and keeps the
+    # hot path from paying for a second LLM inference (matters a lot on CPU). Fall back to the
+    # model only when keywords miss.
+    kw = keyword_objection(text)
+    if kw:
+        return kw
+
     labels = app_state["taxonomy"]
     sys = ("Clasificá el mensaje del deudor en UNA de estas categorías. "
            "Respondé SOLO con la etiqueta exacta (la clave), sin explicación.\nCategorías:\n"
@@ -72,7 +79,8 @@ async def classify_objection(text: str, model: str) -> str | None:
                "options": {"temperature": 0},
                "messages": [{"role": "system", "content": sys}, {"role": "user", "content": text}]}
     try:
-        async with httpx.AsyncClient(timeout=60) as c:
+        timeout = httpx.Timeout(connect=15.0, read=180.0, write=30.0, pool=15.0)
+        async with httpx.AsyncClient(timeout=timeout) as c:
             r = await c.post(f"{OLLAMA_URL}/api/chat", json=payload)
             r.raise_for_status()
             out = (r.json().get("message", {}).get("content") or "").strip().lower()
@@ -81,7 +89,7 @@ async def classify_objection(text: str, model: str) -> str | None:
                 return o["objection_type"]
     except Exception:
         pass
-    return keyword_objection(text)
+    return None
 
 
 async def chat_stream(model: str, messages: list) -> dict:
@@ -92,7 +100,10 @@ async def chat_stream(model: str, messages: list) -> dict:
     text = ""
     eval_count = 0
     eval_dur = 0
-    async with httpx.AsyncClient(timeout=180) as c:
+    # read=None: never time out mid-generation. CPU inference streams slowly but steadily; a fixed
+    # read timeout would 500 a request that's genuinely still producing tokens. Bounded only by connect.
+    timeout = httpx.Timeout(connect=15.0, read=None, write=30.0, pool=15.0)
+    async with httpx.AsyncClient(timeout=timeout) as c:
         async with c.stream("POST", f"{OLLAMA_URL}/api/chat", json=payload) as r:
             r.raise_for_status()
             async for line in r.aiter_lines():
