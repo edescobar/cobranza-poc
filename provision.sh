@@ -16,7 +16,7 @@ printf 'POSTGRES_PASSWORD=cobranza-poc-local\nOLLAMA_MODEL=qwen3:4b\n' > .env
 
 docker compose up -d postgres api ollama
 echo ">>> waiting for ollama to come up..."; sleep 15
-docker compose exec -T ollama ollama pull qwen3:4b
+docker compose exec -T ollama ollama pull qwen3:4b </dev/null   # </dev/null so curl|bash doesn't eat the rest of the script
 docker compose exec -T postgres psql -U cobranza -d cobranza < db/seed_sample.sql
 sleep 5
 

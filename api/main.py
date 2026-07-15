@@ -66,7 +66,8 @@ async def classify_objection(text: str, model: str) -> str | None:
     labels = app_state["taxonomy"]
     sys = ("Clasificá el mensaje del deudor en UNA de estas categorías. "
            "Respondé SOLO con la etiqueta exacta (la clave), sin explicación.\nCategorías:\n"
-           + "\n".join(f"- {o['objection_type']}: {o['description_es']}" for o in labels))
+           + "\n".join(f"- {o['objection_type']}: {o['description_es']}" for o in labels)
+           + "\n\n/no_think")   # Qwen3 soft-switch: disable reasoning (latency)
     payload = {"model": model, "stream": False, "think": False,
                "options": {"temperature": 0},
                "messages": [{"role": "system", "content": sys}, {"role": "user", "content": text}]}
@@ -131,7 +132,9 @@ async def reply(req: ReplyReq):
             if row:
                 tactic, tactic_desc = row["tactic"], row["description_es"]
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    # `/no_think` disables Qwen3's reasoning mode (a one-line collections reply must be instant,
+    # not preceded by thousands of reasoning tokens). Paired with think:false in the payload.
+    messages = [{"role": "system", "content": SYSTEM_PROMPT + "\n\n/no_think"}]
     if tactic:
         messages.append({"role": "system",
                          "content": f"Táctica sugerida para esta situación: {tactic} — {tactic_desc}. "

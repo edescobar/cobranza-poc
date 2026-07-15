@@ -40,6 +40,7 @@ services:
     volumes:
       - ./prompts:/app/prompts:ro
       - ./web:/app/web:ro
+      - ./api/main.py:/app/main.py:ro    # mounted so code changes need only a restart, not a rebuild
     ports:
       - "8000:8000"
     depends_on:
