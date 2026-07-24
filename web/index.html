@@ -62,6 +62,8 @@
     <button data-t="Puedo pagar la mitad nomás">pago parcial</button>
   </div>
   <button class="send" id="send">Enviar ▸</button>
+  <button class="send" id="mic" style="background:var(--accent-cyan,#8dcaf2)">🎤 Hablar</button>
+  <label style="margin-left:12px"><input type="checkbox" id="speak" checked> 🔊 leer la respuesta</label>
 
   <div class="cards">
     <div class="card on">
@@ -102,17 +104,48 @@ function render(prefix, d) {
     (d.tok_per_sec ? ` · ${d.tok_per_sec} tok/s` : '') + `</div>`;
 }
 
-$('#send').onclick = async () => {
+// Spanish text-to-speech (the agent's "mouth") — works on http, no secure context needed.
+function speak(text) {
+  if (!$('#speak').checked || !text) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'es-MX';
+  const v = window.speechSynthesis.getVoices().find(x => x.lang && x.lang.startsWith('es'));
+  if (v) u.voice = v;
+  window.speechSynthesis.speak(u);
+}
+
+async function runTurn() {
   const btn = $('#send'); btn.disabled = true;
   $('#r-on').innerHTML = $('#r-off').innerHTML = '<span class="spin">pensando…</span>';
   $('#m-on').textContent = $('#m-off').textContent = '';
   try {
     const [on, off] = await Promise.all([call(true), call(false)]);
     render('on', on); render('off', off);
+    speak(on.reply);          // speak the pattern-guided reply aloud
   } catch (e) {
     $('#r-on').textContent = $('#r-off').textContent = 'error: ' + e;
   } finally { btn.disabled = false; }
-};
+}
+$('#send').onclick = runTurn;
+
+// Spanish speech-to-text (the agent's "ears") — NOTE: browsers require HTTPS for the mic,
+// so this works on the Cloudflare https URL, not the raw http://IP.
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SR) {
+  const rec = new SR();
+  rec.lang = 'es-MX'; rec.interimResults = false; rec.maxAlternatives = 1;
+  $('#mic').onclick = () => { try { rec.start(); $('#mic').textContent = '🎤 escuchando…'; } catch (e) {} };
+  rec.onresult = (e) => { $('#text').value = e.results[0][0].transcript; runTurn(); };
+  rec.onerror = (e) => {
+    $('#mic').textContent = '🎤 Hablar';
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed')
+      alert('El micrófono necesita HTTPS. Abrí la URL de Cloudflare (https://…), no la IP.');
+  };
+  rec.onend = () => { $('#mic').textContent = '🎤 Hablar'; };
+} else {
+  $('#mic').onclick = () => alert('Este navegador no soporta reconocimiento de voz — usá Chrome.');
+}
 </script>
 </body>
 </html>
